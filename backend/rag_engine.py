@@ -33,7 +33,7 @@ def load_vector_db():
     model_name="all-MiniLM-L6-v2"
 )
 
-    return FAISS.load_local(VECTOR_DB_PATH, embeddings)
+    return FAISS.load_local(VECTOR_DB_PATH, embeddings, allow_dangerous_deserialization=True)
 
 if __name__ == "__main__":
     pdf_path = "data/Annual-Report-2024-25.pdf"
