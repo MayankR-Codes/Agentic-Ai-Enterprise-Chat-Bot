@@ -1,118 +1,195 @@
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.tools import Tool
-from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-
-from backend.tools import create_it_ticket, schedule_meeting, issue_detector
-from backend.prompts import AGENT_SYSTEM_PROMPT, ISSUE_DETECTION_PROMPT
-from backend.rag_engine import load_vector_db
 import json
 from dotenv import load_dotenv
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Initialize LLM
-load_dotenv()
+from .prompts import ISSUE_DETECTION_PROMPT
+from .tools import create_it_ticket, schedule_meeting
+from .rag_engine import load_vector_db
 
+
+# ==================== ENVIRONMENT SETUP ====================
+load_dotenv(override=True)
+
+API_KEY = os.getenv("GOOGLE_API_KEY")
+if not API_KEY:
+    raise ValueError("GOOGLE_API_KEY missing")
+
+
+# ==================== LLM INITIALIZATION ====================
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash-lite",
     temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY"),
+    google_api_key=API_KEY,
 )
 
-def detect_issue(user_query: str) -> dict:
+
+# ==================== ENTERPRISE AGENT CLASS ====================
+class EnterpriseAgent:
     """
-    Classify query as ISSUE or INFORMATIONAL
-    Returns: {"type": "issue" or "query", "severity": "high/medium/low", "category": "..."}
+    Main agent class that handles:
+    1. Intent classification (ISSUE vs QUERY)
+    2. Action confirmation for issues
+    3. RAG-based query answering
     """
-    classification_prompt = ISSUE_DETECTION_PROMPT.format(query=user_query)
-    
-    try:
-        response = llm.invoke(classification_prompt)
-        result = json.loads(response.content)
-        return result
-    except Exception as e:
-        # If JSON parsing fails, default to query
-        return {"type": "query", "severity": "low", "category": "unknown"}
 
+    def __init__(self):
+        """Initialize the agent with vector database and retriever."""
+        try:
+            self.vector_db = load_vector_db()
+            # MMR (Maximum Marginal Relevance) retriever for better document ranking
+            self.retriever = self.vector_db.as_retriever(
+                search_type="mmr",
+                search_kwargs={"k": 10, "fetch_k": 20}
+            )
+        except Exception:
+            self.retriever = None
 
-def get_agent():
-    """
-    Returns an agent-like object that can process queries and execute tools.
-    Uses a simpler approach without AgentExecutor for compatibility.
-    """
-    # 1️⃣ Gemini LLM
-    llm_instance = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
-        temperature=0,
-        google_api_key=os.getenv("GOOGLE_API_KEY"),
-    )
+        self.pending_action = None  # For confirmation flow
 
-    # 2️⃣ Load FAISS vector DB
-    try:
-        vector_db = load_vector_db()
-        retriever = vector_db.as_retriever(search_kwargs={"k": 3})
-    except Exception as e:
-        print(f"⚠️ Vector DB not found: {e}")
-        retriever = None
-
-    # 3️⃣ Create a simple agent wrapper
-    class SimpleAgent:
-        def __init__(self, llm, retriever):
-            self.llm = llm
-            self.retriever = retriever
-
-        def invoke(self, input_dict, *args, **kwargs):
-            """Process user query and route to appropriate tool/RAG.
-
-            Accepts either a dict with an `input` key or a plain string.
-            Accepts and ignores extra kwargs (e.g. `return_intermediate_steps`) passed
-            by calling frameworks to maintain compatibility.
-            """
-            # Support being called with a plain string instead of a dict
-            if isinstance(input_dict, str):
-                user_query = input_dict
-            else:
-                user_query = input_dict.get("input", "")
+    # ==================== MAIN ENTRY POINT ====================
+    def invoke(self, user_input: str) -> dict:
+        """
+        Main entry point for processing user queries.
+        Ensures exactly ONE LLM call per invocation.
+        
+        Args:
+            user_input: User's message
             
-            # Classify if it's an issue
-            issue_check = detect_issue(user_query)
+        Returns:
+            Dictionary with 'output' key containing response text
+        """
+
+        # Step 1: Handle confirmation if pending
+        if self.pending_action:
+            return self._handle_confirmation(user_input)
+
+        # Step 2: Classify intent (ISSUE or QUERY)
+        prompt = ISSUE_DETECTION_PROMPT.format(query=user_input)
+
+        try:
+            response = llm.invoke(prompt)
+            raw = response.content.strip()
+
+            # Extract JSON from response
+            start = raw.find("{")
+            end = raw.rfind("}")
+
+            if start == -1 or end == -1:
+                raise ValueError(f"No JSON found in response: {raw[:100]}")
+
+            json_str = raw[start:end + 1]
+            decision = json.loads(json_str)
+
+            # Validate required fields
+            if "type" not in decision or "requires_action" not in decision:
+                raise ValueError("Missing required fields in JSON")
+
+        except Exception as e:
+            # Default to QUERY if classification fails
+            print(f"Classification error: {e}")
+            decision = {
+                "type": "query",
+                "severity": "low",
+                "category": "general_query",
+                "requires_action": False
+            }
+
+        # Step 3: Handle ISSUE flow
+        if decision.get("type") == "issue" and decision.get("requires_action"):
+            self.pending_action = {
+                "category": decision.get("category"),
+                "query": user_input,
+            }
+            return {
+                "output": (
+                    "⚠️ I detected this as an issue.\n\n"
+                    "Do you want me to proceed?\n"
+                    "👉 Reply **yes** or **no**."
+                )
+            }
+
+        # Step 4: Handle QUERY flow (RAG)
+        return self._handle_query(user_input)
+
+    # ==================== CONFIRMATION HANDLER ====================
+    def _handle_confirmation(self, reply: str) -> dict:
+        """
+        Handle user confirmation for issue actions.
+        
+        Args:
+            reply: User's yes/no response
             
-            if issue_check.get("type") == "issue":
-                # Handle as issue - create ticket or schedule meeting
-                if "meeting" in user_query.lower() or "hr" in user_query.lower():
-                    result = schedule_meeting(
-                        department="HR",
-                        reason=user_query,
-                        user_name="User",
-                        user_email=""
-                    )
-                else:
-                    result = create_it_ticket(
-                        issue=user_query,
-                        user_name="User",
-                        user_email=""
-                    )
-                return {"output": json.dumps(result)}
-            else:
-                # Handle as query - use RAG
-                if self.retriever:
-                    docs = self.retriever.invoke(user_query)
-                    doc_texts = [d.page_content if hasattr(d, 'page_content') else str(d) for d in docs]
-                    context = "\n---\n".join(doc_texts[:3])
-                    
-                    # Generate answer with LLM using context
-                    prompt = f"""Based on the following context, answer the question:
+        Returns:
+            Dictionary with 'output' key containing response
+        """
+        reply = reply.lower().strip()
+
+        if reply not in ["yes", "no"]:
+            return {"output": "Please reply with **yes** or **no**."}
+
+        action = self.pending_action
+        self.pending_action = None
+
+        if reply == "no":
+            return {"output": "✅ Action cancelled. How else can I help?"}
+
+        # Execute action based on category
+        if action["category"] == "hr_meeting":
+            result = schedule_meeting(
+                department="HR",
+                reason=action["query"],
+                user_name="User",
+                user_email=""
+            )
+        else:
+            result = create_it_ticket(
+                issue=action["query"],
+                user_name="User",
+                user_email=""
+            )
+
+        return {"output": result["message"]}
+
+    # ==================== QUERY HANDLER (RAG) ====================
+    def _handle_query(self, query: str) -> dict:
+        """
+        Handle informational queries using RAG (Retrieval Augmented Generation).
+        
+        Args:
+            query: User's question
+            
+        Returns:
+            Dictionary with 'output' key containing LLM response
+        """
+        if not self.retriever:
+            return {"output": "Knowledge base unavailable."}
+
+        # Retrieve relevant documents
+        docs = self.retriever.invoke(query)
+        context = "\n---\n".join(d.page_content for d in docs[:3])
+
+        # Build answer prompt
+        answer_prompt = f"""
+Answer using ONLY the context below.
+If not found, say: "Information not found in documents."
 
 Context:
 {context}
 
-Question: {user_query}
+Question: {query}
+"""
 
-Answer: """
-                    response = self.llm.invoke(prompt)
-                    return {"output": response.content}
-                else:
-                    return {"output": "Knowledge base unavailable. Please check your system."}
+        response = llm.invoke(answer_prompt)
+        return {"output": response.content}
+
+
+# ==================== FACTORY FUNCTION ====================
+def get_agent() -> EnterpriseAgent:
+    """
+    Factory function to create and return an EnterpriseAgent instance.
     
-    agent = SimpleAgent(llm_instance, retriever)
-    return agent
+    Returns:
+        EnterpriseAgent: Initialized agent instance
+    """
+    return EnterpriseAgent()

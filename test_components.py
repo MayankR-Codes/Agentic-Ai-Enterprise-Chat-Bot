@@ -54,7 +54,7 @@ def test_vector_db():
     """Test vector database"""
     print("\n[DB] Testing vector database...")
     try:
-        from backend.rag_engine import load_vector_db
+        from Backend.rag_engine import load_vector_db
         db = load_vector_db()
         
         # Try a simple search
@@ -109,7 +109,7 @@ def test_agent():
     """Test agent initialization"""
     print("\n[AGENT] Testing Agent...")
     try:
-        from backend.agent import get_agent, detect_issue
+        from Backend.agent import get_agent, detect_issue
         
         agent = get_agent()
         print("  [PASS] Agent initialized successfully")
@@ -129,7 +129,7 @@ def test_tools():
     """Test tool functions"""
     print("\n[TOOLS] Testing Tools...")
     try:
-        from backend.tools import (
+        from Backend.tools import (
             create_it_ticket,
             schedule_meeting,
             issue_detector,
@@ -169,7 +169,7 @@ def test_prompts():
     """Test prompt templates"""
     print("\n[PROMPTS] Testing Prompts...")
     try:
-        from backend.prompts import (
+        from Backend.prompts import (
             AGENT_SYSTEM_PROMPT,
             ISSUE_DETECTION_PROMPT,
             SYSTEM_INSTRUCTIONS

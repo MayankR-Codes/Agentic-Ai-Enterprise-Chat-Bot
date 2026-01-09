@@ -1,16 +1,57 @@
 import json
 import smtplib
+import sqlite3
+import os
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ============ TICKET DATABASE (In-Memory) ============
-TICKETS_DB = []
-MEETINGS_DB = []
+# ============ DB CONFIGURATION ============
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "enterprise_db.sqlite")
+
+def init_db():
+    """Initialize the SQLite database with required tables"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Create Tickets Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS tickets (
+        ticket_id TEXT PRIMARY KEY,
+        issue TEXT,
+        user_name TEXT,
+        user_email TEXT,
+        status TEXT,
+        priority TEXT,
+        assigned_to TEXT,
+        created_at TEXT
+    )
+    """)
+    
+    # Create Meetings Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS meetings (
+        meeting_id TEXT PRIMARY KEY,
+        department TEXT,
+        date TEXT,
+        time TEXT,
+        reason TEXT,
+        user_name TEXT,
+        user_email TEXT,
+        status TEXT,
+        created_at TEXT
+    )
+    """)
+    
+    conn.commit()
+    conn.close()
+
+# Initialize DB on module load (or call explicitly from app.py)
+init_db()
 
 # ============ EMAIL CONFIGURATION ============
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
@@ -47,37 +88,35 @@ def send_email(recipient: str, subject: str, body: str) -> bool:
 def create_it_ticket(issue: str, user_name: str = "User", user_email: str = "") -> dict:
     """
     Create an IT support ticket
-    
-    Args:
-        issue: Description of the IT issue
-        user_name: Name of the person reporting
-        user_email: Email for updates
-    
-    Returns:
-        Ticket confirmation with ID
     """
-    ticket_id = f"TICKET-{len(TICKETS_DB) + 1001}"
+    # Generate ID
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Simple ID generation logic based on count
+    cursor.execute("SELECT COUNT(*) FROM tickets")
+    count = cursor.fetchone()[0]
+    ticket_id = f"TICKET-{count + 1001}"
+    
     timestamp = datetime.now().isoformat()
+    status = "OPEN"
+    priority = "MEDIUM"
+    assigned_to = "IT Support Team"
     
-    ticket = {
-        "ticket_id": ticket_id,
-        "issue": issue,
-        "user_name": user_name,
-        "user_email": user_email,
-        "status": "OPEN",
-        "priority": "MEDIUM",
-        "created_at": timestamp,
-        "assigned_to": "IT Support Team"
-    }
+    cursor.execute("""
+        INSERT INTO tickets (ticket_id, issue, user_name, user_email, status, priority, assigned_to, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (ticket_id, issue, user_name, user_email, status, priority, assigned_to, timestamp))
     
-    TICKETS_DB.append(ticket)
+    conn.commit()
+    conn.close()
     
     # Send confirmation email
     email_body = f"""
     <h2>IT Support Ticket Created</h2>
     <p><strong>Ticket ID:</strong> {ticket_id}</p>
     <p><strong>Issue:</strong> {issue}</p>
-    <p><strong>Status:</strong> OPEN</p>
+    <p><strong>Status:</strong> {status}</p>
     <p><strong>Created:</strong> {timestamp}</p>
     <p>Our IT team will investigate and contact you shortly.</p>
     """
@@ -103,42 +142,34 @@ def schedule_meeting(
 ) -> dict:
     """
     Schedule a meeting with HR or other department
-    
-    Args:
-        department: Department to meet (HR, Management, etc.)
-        date: Preferred date (YYYY-MM-DD)
-        time: Preferred time (HH:MM)
-        reason: Reason for meeting
-        user_name: Name of person scheduling
-        user_email: Email for confirmation
-    
-    Returns:
-        Meeting confirmation with ID
     """
-    meeting_id = f"MEETING-{len(MEETINGS_DB) + 2001}"
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT COUNT(*) FROM meetings")
+    count = cursor.fetchone()[0]
+    meeting_id = f"MEETING-{count + 2001}"
+    
     timestamp = datetime.now().isoformat()
+    status = "PENDING"
+    date_val = date or "To be scheduled"
+    time_val = time or "To be scheduled"
     
-    meeting = {
-        "meeting_id": meeting_id,
-        "department": department,
-        "date": date or "To be scheduled",
-        "time": time or "To be scheduled",
-        "reason": reason,
-        "user_name": user_name,
-        "user_email": user_email,
-        "status": "PENDING",
-        "created_at": timestamp
-    }
+    cursor.execute("""
+        INSERT INTO meetings (meeting_id, department, date, time, reason, user_name, user_email, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (meeting_id, department, date_val, time_val, reason, user_name, user_email, status, timestamp))
     
-    MEETINGS_DB.append(meeting)
+    conn.commit()
+    conn.close()
     
     # Send email to HR
     email_body = f"""
     <h2>New Meeting Request</h2>
     <p><strong>Meeting ID:</strong> {meeting_id}</p>
     <p><strong>Department:</strong> {department}</p>
-    <p><strong>Requested Date:</strong> {date or 'TBD'}</p>
-    <p><strong>Requested Time:</strong> {time or 'TBD'}</p>
+    <p><strong>Requested Date:</strong> {date_val}</p>
+    <p><strong>Requested Time:</strong> {time_val}</p>
     <p><strong>Reason:</strong> {reason}</p>
     <p><strong>Requester:</strong> {user_name} ({user_email})</p>
     <p>Please review and confirm availability.</p>
@@ -170,8 +201,8 @@ def issue_detector(query: str) -> dict:
     query_lower = query.lower()
     
     # Issue keywords
-    it_keywords = ["error", "crash", "bug", "not working", "broken", "system down", "issue"]
-    hr_keywords = ["meeting", "hr", "schedule", "appointment", "complaint", "issue", "problem"]
+    it_keywords = ["error", "crash", "bug", "not working", "broken", "system down", "issue", "fail"]
+    hr_keywords = ["meeting", "hr", "schedule", "appointment", "complaint", "issue", "problem", "discuss"]
     
     has_it_issue = any(kw in query_lower for kw in it_keywords)
     has_hr_need = any(kw in query_lower for kw in hr_keywords)
@@ -186,17 +217,40 @@ def issue_detector(query: str) -> dict:
 
 def get_ticket_status(ticket_id: str) -> dict:
     """Get status of a support ticket"""
-    for ticket in TICKETS_DB:
-        if ticket["ticket_id"] == ticket_id:
-            return ticket
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM tickets WHERE ticket_id = ?", (ticket_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        return dict(row)
     return {"error": "Ticket not found"}
 
 
 def get_all_tickets() -> list:
     """Get all tickets (for admin dashboard)"""
-    return TICKETS_DB
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM tickets ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return [dict(row) for row in rows]
 
 
 def get_all_meetings() -> list:
     """Get all meeting requests (for HR dashboard)"""
-    return MEETINGS_DB
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM meetings ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return [dict(row) for row in rows]

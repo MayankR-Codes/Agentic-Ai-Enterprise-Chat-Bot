@@ -22,13 +22,17 @@ QUERY = User asks informational questions about company policies, reports, proce
 
 Query: {query}
 
-Respond ONLY with JSON (no markdown):
-{{
-    "type": "issue" or "query",
-    "severity": "high" or "medium" or "low",
-    "category": "it_issue" or "hr_meeting" or "general_query" or "policy_question",
-    "requires_action": true or false
-}}
+INSTRUCTIONS:
+- Return ONLY a valid JSON object (no markdown, no extra text)
+- Do NOT use markdown code blocks
+- Do NOT include explanations before or after
+- type must be "issue" or "query"
+- severity must be "high", "medium", or "low"
+- category must be "it_issue", "hr_meeting", "general_query", or "policy_question"
+- requires_action must be true or false
+
+JSON:
+{{"type":"query","severity":"low","category":"general_query","requires_action":false}}
 """
 
 SYSTEM_INSTRUCTIONS = """
