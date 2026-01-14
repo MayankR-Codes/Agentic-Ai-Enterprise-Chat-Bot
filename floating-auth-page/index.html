@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Portal | Modern SaaS</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="background-gradient"></div>
+
+    <main class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo-pulse">
+                    <i class="fas fa-rocket"></i>
+                </div>
+                <h1>Welcome Back</h1>
+                <p>Manage your enterprise workspace with ease.</p>
+            </div>
+
+            <div class="tab-container">
+                <div class="tab-header">
+                    <button class="tab-btn active" data-tab="signin">Sign In</button>
+                    <button class="tab-btn" data-tab="signup">Create Account</button>
+                    <div class="tab-indicator"></div>
+                </div>
+            </div>
+
+            <div class="form-container">
+                <!-- Sign In Form -->
+                <form id="signin-form" class="auth-form active">
+                    <div class="input-group">
+                        <div class="field-wrapper">
+                            <i class="fas fa-user field-icon"></i>
+                            <input type="text" id="login-username" class="floating-input" placeholder=" " required>
+                            <label for="login-username" class="floating-label">Username or Email</label>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="field-wrapper">
+                            <i class="fas fa-lock field-icon"></i>
+                            <input type="password" id="login-password" class="floating-input" placeholder=" " required>
+                            <label for="login-password" class="floating-label">Password</label>
+                            <button type="button" class="toggle-password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="field-footer">
+                            <a href="#" class="text-link sm">Forgot password?</a>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary lg">
+                        <span class="btn-text">Sign In</span>
+                        <div class="btn-loader"></div>
+                    </button>
+
+                    <div class="divider">
+                        <span>Or continue with</span>
+                    </div>
+
+                    <div class="social-logins">
+                        <button type="button" class="btn-social">
+                            <img src="https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png" alt="Google">
+                            <span>Google</span>
+                        </button>
+                        <button type="button" class="btn-social">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg"
+                                alt="Microsoft">
+                            <span>Microsoft</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Sign Up Form -->
+                <form id="signup-form" class="auth-form">
+                    <div class="input-grid">
+                        <div class="input-group">
+                            <div class="field-wrapper">
+                                <i class="fas fa-id-card field-icon"></i>
+                                <input type="text" id="reg-fullname" class="floating-input" placeholder=" " required>
+                                <label for="reg-fullname" class="floating-label">Full Name</label>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <div class="field-wrapper">
+                                <i class="fas fa-at field-icon"></i>
+                                <input type="text" id="reg-username" class="floating-input" placeholder=" " required>
+                                <label for="reg-username" class="floating-label">Username</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="field-wrapper">
+                            <i class="fas fa-envelope field-icon"></i>
+                            <input type="email" id="reg-email" class="floating-input" placeholder=" " required>
+                            <label for="reg-email" class="floating-label">Email Address</label>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="field-wrapper">
+                            <i class="fas fa-lock field-icon"></i>
+                            <input type="password" id="reg-password" class="floating-input" placeholder=" " required>
+                            <label for="reg-password" class="floating-label">Password</label>
+                            <button type="button" class="toggle-password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="field-wrapper">
+                            <i class="fas fa-shield-alt field-icon"></i>
+                            <input type="password" id="reg-confirm-password" class="floating-input" placeholder=" "
+                                required>
+                            <label for="reg-confirm-password" class="floating-label">Confirm Password</label>
+                            <button type="button" class="toggle-password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary lg">
+                        <span class="btn-text">Create Account</span>
+                        <div class="btn-loader"></div>
+                    </button>
+
+                    <div class="form-footer">
+                        <p>Already have an account? <a href="#" class="text-link switch-to-signin">Sign In</a></p>
+                    </div>
+                </form>
+            </div>
+
+            <footer class="footer">
+                <p>© 2026 ModernSaaS. All rights reserved.</p>
+                <div class="footer-links">
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                </div>
+            </footer>
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
