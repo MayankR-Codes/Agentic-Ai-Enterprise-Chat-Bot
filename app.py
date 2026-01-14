@@ -100,6 +100,7 @@ with tab1:
         with chat_container:
             for msg in st.session_state.messages:
                 with st.chat_message(msg["role"]):
+                    # Display message content
                     st.markdown(msg["content"], unsafe_allow_html=True)
         
         # -------- INPUT --------
@@ -146,6 +147,7 @@ with tab1:
                             unsafe_allow_html=True
                         )
                         
+                        # Store message
                         st.session_state.messages.append({
                             "role": "assistant",
                             "content": response_text

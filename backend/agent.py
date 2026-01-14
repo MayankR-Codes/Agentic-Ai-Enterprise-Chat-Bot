@@ -1,43 +1,60 @@
 import os
 import json
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 
 from .prompts import ISSUE_DETECTION_PROMPT
 from .tools import create_it_ticket, schedule_meeting
 from .rag_engine import load_vector_db
 
 
-# ==================== ENVIRONMENT SETUP ====================
+# ==================== ENV ====================
 load_dotenv(override=True)
 
-API_KEY = os.getenv("GOOGLE_API_KEY")
+API_KEY = os.getenv("GROQ_API_KEY")
 if not API_KEY:
-    raise ValueError("GOOGLE_API_KEY missing")
+    raise ValueError("GROQ_API_KEY missing")
 
 
-# ==================== LLM INITIALIZATION ====================
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite",
+# ==================== LLM (SUPPORTED MODEL) ====================
+llm = ChatGroq(
+    model="llama-3.1-8b-instant",   # ✅ ACTIVE + FREE
     temperature=0,
-    google_api_key=API_KEY,
+    groq_api_key=API_KEY,
 )
 
+def create_llm():
+    models = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant"
+    ]
 
-# ==================== ENTERPRISE AGENT CLASS ====================
+    for model in models:
+        try:
+            return ChatGroq(
+                model=model,
+                temperature=0,
+                groq_api_key=os.getenv("GROQ_API_KEY"),
+            )
+        except Exception:
+            continue
+
+    raise RuntimeError("No supported Groq model found")
+
+llm = create_llm()
+
+# ==================== AGENT ====================
 class EnterpriseAgent:
     """
-    Main agent class that handles:
-    1. Intent classification (ISSUE vs QUERY)
-    2. Action confirmation for issues
-    3. RAG-based query answering
+    Single-entry enterprise agent:
+    - Intent detection
+    - Issue confirmation
+    - RAG-based answering
     """
 
     def __init__(self):
-        """Initialize the agent with vector database and retriever."""
         try:
             self.vector_db = load_vector_db()
-            # MMR (Maximum Marginal Relevance) retriever for better document ranking
             self.retriever = self.vector_db.as_retriever(
                 search_type="mmr",
                 search_kwargs={"k": 10, "fetch_k": 20}
@@ -45,61 +62,56 @@ class EnterpriseAgent:
         except Exception:
             self.retriever = None
 
-        self.pending_action = None  # For confirmation flow
+        self.pending_action = None
 
-    # ==================== MAIN ENTRY POINT ====================
+
+    # ==================== MAIN ENTRY ====================
     def invoke(self, user_input: str) -> dict:
         """
-        Main entry point for processing user queries.
-        Ensures exactly ONE LLM call per invocation.
-        
-        Args:
-            user_input: User's message
-            
-        Returns:
-            Dictionary with 'output' key containing response text
+        EXACTLY ONE LLM CALL per user message
         """
 
-        # Step 1: Handle confirmation if pending
+        # 1️⃣ Confirmation flow (NO LLM CALL)
         if self.pending_action:
             return self._handle_confirmation(user_input)
 
-        # Step 2: Classify intent (ISSUE or QUERY)
+        # 2️⃣ Intent detection (ONE LLM CALL)
         prompt = ISSUE_DETECTION_PROMPT.format(query=user_input)
 
         try:
             response = llm.invoke(prompt)
             raw = response.content.strip()
 
-            # Extract JSON from response
             start = raw.find("{")
             end = raw.rfind("}")
-
             if start == -1 or end == -1:
-                raise ValueError(f"No JSON found in response: {raw[:100]}")
+                raise ValueError("No JSON found")
 
-            json_str = raw[start:end + 1]
-            decision = json.loads(json_str)
+            decision = json.loads(raw[start:end + 1])
 
-            # Validate required fields
-            if "type" not in decision or "requires_action" not in decision:
-                raise ValueError("Missing required fields in JSON")
-
-        except Exception as e:
-            # Default to QUERY if classification fails
-            print(f"Classification error: {e}")
+        except Exception:
             decision = {
                 "type": "query",
                 "severity": "low",
                 "category": "general_query",
-                "requires_action": False
+                "requires_action": False,
+                "has_abuse": False
             }
 
-        # Step 3: Handle ISSUE flow
-        if decision.get("type") == "issue" and decision.get("requires_action"):
+        # 3️⃣ Abuse handling
+        if decision.get("has_abuse"):
+            return {
+                "output": (
+                    "I cannot assist with that request. "
+                    "Please keep our conversation professional and respectful."
+                )
+            }
+
+        # 4️⃣ ISSUE FLOW
+        if decision["type"] == "issue" and decision["requires_action"]:
             self.pending_action = {
                 "category": decision.get("category"),
-                "query": user_input,
+                "query": user_input
             }
             return {
                 "output": (
@@ -109,23 +121,15 @@ class EnterpriseAgent:
                 )
             }
 
-        # Step 4: Handle QUERY flow (RAG)
+        # 5️⃣ QUERY FLOW (RAG)
         return self._handle_query(user_input)
 
-    # ==================== CONFIRMATION HANDLER ====================
+
+    # ==================== CONFIRMATION ====================
     def _handle_confirmation(self, reply: str) -> dict:
-        """
-        Handle user confirmation for issue actions.
-        
-        Args:
-            reply: User's yes/no response
-            
-        Returns:
-            Dictionary with 'output' key containing response
-        """
         reply = reply.lower().strip()
 
-        if reply not in ["yes", "no"]:
+        if reply not in ("yes", "no"):
             return {"output": "Please reply with **yes** or **no**."}
 
         action = self.pending_action
@@ -134,7 +138,6 @@ class EnterpriseAgent:
         if reply == "no":
             return {"output": "✅ Action cancelled. How else can I help?"}
 
-        # Execute action based on category
         if action["category"] == "hr_meeting":
             result = schedule_meeting(
                 department="HR",
@@ -151,45 +154,50 @@ class EnterpriseAgent:
 
         return {"output": result["message"]}
 
-    # ==================== QUERY HANDLER (RAG) ====================
+
+    # ==================== QUERY HANDLER ====================
     def _handle_query(self, query: str) -> dict:
-        """
-        Handle informational queries using RAG (Retrieval Augmented Generation).
-        
-        Args:
-            query: User's question
-            
-        Returns:
-            Dictionary with 'output' key containing LLM response
-        """
         if not self.retriever:
             return {"output": "Knowledge base unavailable."}
 
-        # Retrieve relevant documents
         docs = self.retriever.invoke(query)
-        context = "\n---\n".join(d.page_content for d in docs[:3])
 
-        # Build answer prompt
+        if not docs:
+            return {
+                "output": (
+                    "⚠️ This question is OUT OF DOCUMENTS - "
+                    "I can only answer questions related to the provided enterprise documents."
+                )
+            }
+
+        context = "\n---\n".join(d.page_content[:1000] for d in docs[:3])
+        sources = ", ".join(
+            d.metadata.get("source", "Unknown") for d in docs[:3]
+        )
+
         answer_prompt = f"""
-Answer using ONLY the context below.
-If not found, say: "Information not found in documents."
+Answer ONLY using the context below.
+
+RULES:
+- Do NOT use outside knowledge
+- If answer is missing, reply exactly:
+"⚠️ This question is OUT OF DOCUMENTS - I can only answer questions related to the provided enterprise documents."
 
 Context:
 {context}
 
 Question: {query}
+
+Answer:
 """
 
         response = llm.invoke(answer_prompt)
-        return {"output": response.content}
+
+        return {
+            "output": f"{response.content}\n\n📄 Source: {sources}"
+        }
 
 
-# ==================== FACTORY FUNCTION ====================
-def get_agent() -> EnterpriseAgent:
-    """
-    Factory function to create and return an EnterpriseAgent instance.
-    
-    Returns:
-        EnterpriseAgent: Initialized agent instance
-    """
+# ==================== FACTORY ====================
+def get_agent():
     return EnterpriseAgent()
