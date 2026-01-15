@@ -25,6 +25,7 @@ def init_db():
         issue TEXT,
         user_name TEXT,
         user_email TEXT,
+        user_id INTEGER,
         status TEXT,
         priority TEXT,
         assigned_to TEXT,
@@ -42,6 +43,7 @@ def init_db():
         reason TEXT,
         user_name TEXT,
         user_email TEXT,
+        user_id INTEGER,
         status TEXT,
         created_at TEXT
     )
@@ -85,7 +87,7 @@ def send_email(recipient: str, subject: str, body: str) -> bool:
         return False
 
 
-def create_it_ticket(issue: str, user_name: str = "User", user_email: str = "") -> dict:
+def create_it_ticket(issue: str, user_name: str = "User", user_email: str = "", user_id: int = None) -> dict:
     """
     Create an IT support ticket
     """
@@ -104,9 +106,9 @@ def create_it_ticket(issue: str, user_name: str = "User", user_email: str = "") 
     assigned_to = "IT Support Team"
     
     cursor.execute("""
-        INSERT INTO tickets (ticket_id, issue, user_name, user_email, status, priority, assigned_to, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (ticket_id, issue, user_name, user_email, status, priority, assigned_to, timestamp))
+        INSERT INTO tickets (ticket_id, issue, user_name, user_email, user_id, status, priority, assigned_to, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (ticket_id, issue, user_name, user_email, user_id, status, priority, assigned_to, timestamp))
     
     conn.commit()
     conn.close()
@@ -128,7 +130,7 @@ def create_it_ticket(issue: str, user_name: str = "User", user_email: str = "") 
         "action": "create_it_ticket",
         "ticket_id": ticket_id,
         "status": "SUBMITTED",
-        "message": f"✅ IT ticket {ticket_id} has been created. Our support team will contact you shortly."
+        "message": f"IT ticket {ticket_id} has been created. Our support team will contact you shortly."
     }
 
 
@@ -138,7 +140,8 @@ def schedule_meeting(
     time: str = "",
     reason: str = "",
     user_name: str = "User",
-    user_email: str = ""
+    user_email: str = "",
+    user_id: int = None
 ) -> dict:
     """
     Schedule a meeting with HR or other department
@@ -156,9 +159,9 @@ def schedule_meeting(
     time_val = time or "To be scheduled"
     
     cursor.execute("""
-        INSERT INTO meetings (meeting_id, department, date, time, reason, user_name, user_email, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (meeting_id, department, date_val, time_val, reason, user_name, user_email, status, timestamp))
+        INSERT INTO meetings (meeting_id, department, date, time, reason, user_name, user_email, user_id, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (meeting_id, department, date_val, time_val, reason, user_name, user_email, user_id, status, timestamp))
     
     conn.commit()
     conn.close()
@@ -189,7 +192,7 @@ def schedule_meeting(
         "action": "schedule_meeting",
         "meeting_id": meeting_id,
         "status": "PENDING",
-        "message": f"✅ Meeting request {meeting_id} submitted to {department}. You'll receive confirmation email shortly."
+        "message": f"Meeting request {meeting_id} submitted to {department}. You'll receive confirmation email shortly."
     }
 
 
@@ -250,6 +253,32 @@ def get_all_meetings() -> list:
     cursor = conn.cursor()
     
     cursor.execute("SELECT * FROM meetings ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return [dict(row) for row in rows]
+
+
+def get_user_tickets(user_id: int) -> list:
+    """Get tickets created by a specific user"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM tickets WHERE user_id = ? ORDER BY created_at DESC", (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return [dict(row) for row in rows]
+
+
+def get_user_meetings(user_id: int) -> list:
+    """Get meetings created by a specific user"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM meetings WHERE user_id = ? ORDER BY created_at DESC", (user_id,))
     rows = cursor.fetchall()
     conn.close()
     

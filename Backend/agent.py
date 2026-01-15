@@ -18,7 +18,7 @@ if not API_KEY:
 
 # ==================== LLM (SUPPORTED MODEL) ====================
 llm = ChatGroq(
-    model="llama-3.1-8b-instant",   # ✅ ACTIVE + FREE
+    model="llama-3.3-70b-versatile",   # ✅ ACTIVE + FREE
     temperature=0,
     groq_api_key=API_KEY,
 )
@@ -52,7 +52,7 @@ class EnterpriseAgent:
     - RAG-based answering
     """
 
-    def __init__(self):
+    def __init__(self, user_info: dict = None):
         try:
             self.vector_db = load_vector_db()
             self.retriever = self.vector_db.as_retriever(
@@ -63,6 +63,7 @@ class EnterpriseAgent:
             self.retriever = None
 
         self.pending_action = None
+        self.user_info = user_info or {}
 
 
     # ==================== MAIN ENTRY ====================
@@ -113,11 +114,14 @@ class EnterpriseAgent:
                 "category": decision.get("category"),
                 "query": user_input
             }
+            
+            action_text = "schedule an HR meeting" if decision.get("category") == "hr_meeting" else "create an IT ticket"
+            
             return {
                 "output": (
-                    "⚠️ I detected this as an issue.\n\n"
+                    f"I'll help you {action_text}.\n\n"
                     "Do you want me to proceed?\n"
-                    "👉 Reply **yes** or **no**."
+                    "Reply **yes** or **no**."
                 )
             }
 
@@ -136,20 +140,27 @@ class EnterpriseAgent:
         self.pending_action = None
 
         if reply == "no":
-            return {"output": "✅ Action cancelled. How else can I help?"}
+            return {"output": "Action cancelled. How else can I help?"}
+
+        # Get user information
+        user_name = self.user_info.get('full_name', 'User')
+        user_email = self.user_info.get('email', '')
+        user_id = self.user_info.get('id', None)
 
         if action["category"] == "hr_meeting":
             result = schedule_meeting(
                 department="HR",
                 reason=action["query"],
-                user_name="User",
-                user_email=""
+                user_name=user_name,
+                user_email=user_email,
+                user_id=user_id
             )
         else:
             result = create_it_ticket(
                 issue=action["query"],
-                user_name="User",
-                user_email=""
+                user_name=user_name,
+                user_email=user_email,
+                user_id=user_id
             )
 
         return {"output": result["message"]}
@@ -165,7 +176,7 @@ class EnterpriseAgent:
         if not docs:
             return {
                 "output": (
-                    "⚠️ This question is OUT OF DOCUMENTS - "
+                    "This question is OUT OF DOCUMENTS - "
                     "I can only answer questions related to the provided enterprise documents."
                 )
             }
@@ -176,12 +187,22 @@ class EnterpriseAgent:
         )
 
         answer_prompt = f"""
-Answer ONLY using the context below.
+You are an expert enterprise assistant. Provide clear, well-structured answers using the context provided.
+
+INSTRUCTIONS:
+1. Answer ONLY using the context below - do NOT use outside knowledge
+2. Format your response as follows:
+   - Start with a brief summary paragraph (2-3 sentences) that answers the main question
+   - Then provide key details in bullet points below
+3. Use bullet points to organize specific information, statistics, or multiple aspects
+4. Keep each bullet point focused on one key piece of information
+5. Be professional and informative
 
 RULES:
 - Do NOT use outside knowledge
-- If answer is missing, reply exactly:
-"⚠️ This question is OUT OF DOCUMENTS - I can only answer questions related to the provided enterprise documents."
+- Always start with a summary paragraph, then use bullet points for details
+- If the answer is completely missing from context, reply exactly:
+"This question is OUT OF DOCUMENTS - I can only answer questions related to the provided enterprise documents."
 
 Context:
 {context}
@@ -194,10 +215,10 @@ Answer:
         response = llm.invoke(answer_prompt)
 
         return {
-            "output": f"{response.content}\n\n📄 Source: {sources}"
+            "output": response.content
         }
 
 
 # ==================== FACTORY ====================
-def get_agent():
-    return EnterpriseAgent()
+def get_agent(user_info: dict = None):
+    return EnterpriseAgent(user_info=user_info)

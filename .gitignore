@@ -58,6 +58,9 @@ enterprise_db.sqlite
 *.sqlite
 *.sqlite3
 
+# Migration script (can be committed, but if you want to exclude it)
+# migrate_db.py
+
 # Streamlit
 .streamlit/
 __pycache__/

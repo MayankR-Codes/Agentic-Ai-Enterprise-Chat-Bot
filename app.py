@@ -11,13 +11,13 @@ load_dotenv()
 
 # -------------------- BACKEND --------------------
 from Backend.agent import get_agent
-from Backend.tools import get_all_tickets, get_all_meetings
+from Backend.tools import get_all_tickets, get_all_meetings, get_user_tickets, get_user_meetings
 from Backend.auth import login_user, create_user, get_user_by_username
 
 # -------------------- PAGE CONFIG --------------------
 st.set_page_config(
     page_title="HCLTech Enterprise Assistant",
-    page_icon="🤖",
+    page_icon="🏢",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -55,13 +55,13 @@ def add_notification(message, type="info"):
     # 2. Show Toast (if enabled)
     if st.session_state.get('notifications_enabled', True):
         if type == "success":
-            st.toast(f"✅ {message}")
+            st.toast(f"{message}")
         elif type == "error":
-            st.toast(f"❌ {message}")
+            st.toast(f"{message}")
         elif type == "warning":
-            st.toast(f"⚠️ {message}")
+            st.toast(f"{message}")
         else:
-            st.toast(f"ℹ️ {message}")
+            st.toast(f"{message}")
 
     # 3. Add to Browser Alert Queue (if allowed)
     if st.session_state.get('browser_notifications_allowed', False):
@@ -71,7 +71,7 @@ def notify_status_change():
     if st.session_state.notifications_enabled:
         add_notification("System notifications enabled", type="success")
     else:
-        st.toast("🔕 Notifications silenced") # Don't add to log if muted? Actually, maybe we should.
+        st.toast("Notifications silenced") # Don't add to log if muted? Actually, maybe we should.
 
 # -------------------- SESSION RECOVERY --------------------
 # Check for session token in URL if not already logged in
@@ -107,18 +107,16 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
         
-        # Log Out Button (Right below profile)
-        if st.button("Log Out", use_container_width=True, key="logout_btn"):
-            st.session_state.logged_in = False
-            st.session_state.user = None
-            st.query_params.clear()
-            add_notification("Successfully signed out.", type="info")
-            st.rerun()
+        st.divider()
+        
+        # 1. History
+        st.markdown("### History")
+        st.metric("Messages", len(st.session_state.get("messages", [])))
         
         st.divider()
 
         # 2. Activity Log
-        log_label = f"Activity Log {'▼' if st.session_state.show_activity_log else '▶'}"
+        log_label = f"Activity Log {'-' if st.session_state.show_activity_log else '+'}"
         if st.button(log_label, use_container_width=True, key="activity_log_toggle"):
             st.session_state.show_activity_log = not st.session_state.show_activity_log
             st.rerun()
@@ -144,14 +142,22 @@ with st.sidebar:
                 st.markdown("</div>", unsafe_allow_html=True)
 
         st.divider()
-        st.markdown("### 📥 Data Reports")
         
-        all_tickets = get_all_tickets()
-        all_meetings = get_all_meetings()
+        # 3. Data Reports
+        st.markdown("### Data Reports")
+        
+        # Get user-specific data
+        user_id = st.session_state.user.get('id') if st.session_state.user else None
+        if user_id:
+            all_tickets = get_user_tickets(user_id)
+            all_meetings = get_user_meetings(user_id)
+        else:
+            all_tickets = []
+            all_meetings = []
         
         if all_tickets:
             st.download_button(
-                label="📄 Export All Tickets (JSON)",
+                label="Export All Tickets (JSON)",
                 data=pd.DataFrame(all_tickets).to_json(orient="records", indent=4),
                 file_name=f"all_tickets_{datetime.now().strftime('%Y%m%d')}.json",
                 mime="application/json",
@@ -161,7 +167,7 @@ with st.sidebar:
             
         if all_meetings:
             st.download_button(
-                label="📅 Export All Meetings (JSON)",
+                label="Export All Meetings (JSON)",
                 data=pd.DataFrame(all_meetings).to_json(orient="records", indent=4),
                 file_name=f"all_meetings_{datetime.now().strftime('%Y%m%d')}.json",
                 mime="application/json",
@@ -169,12 +175,17 @@ with st.sidebar:
                 key="sidebar_export_meetings"
             )
         
-        # Live System Stats
         st.divider()
-        st.markdown("### 📊 History")
-        c1, c2 = st.columns(2)
-        c1.metric("Messages", len(st.session_state.get("messages", [])))
-        c2.metric("Actions", len(all_tickets) + len(all_meetings))
+        
+        # 4. Log Out Button (At the bottom)
+        if st.button("Log Out", use_container_width=True, key="logout_btn"):
+            st.session_state.logged_in = False
+            st.session_state.user = None
+            st.session_state.agent = None  # Clear agent on logout
+            st.session_state.messages = []  # Clear chat history
+            st.query_params.clear()
+            add_notification("Successfully signed out.", type="info")
+            st.rerun()
         
         st.divider()
         
@@ -187,29 +198,29 @@ with st.sidebar:
         """, unsafe_allow_html=True)
 
 # -------------------- STYLING --------------------
-# Dark Mode Only (Always Active)
-bg_primary = "#111827"
-bg_card = "#1f2937"
-text_primary = "#f9fafb"
-text_secondary = "#d1d5db"
-border_color = "#374151"
-bubble_user = "#4338ca"
-bubble_user_text = "white"
-bubble_assistant = "#1f2937"
-bubble_assistant_text = "#f9fafb"
-auth_card_bg = "rgba(17, 24, 39, 0.95)"
-input_bg = "#1f2937"
+# Professional Enterprise Color Scheme
+bg_primary = "#0a1628"
+bg_card = "#111f35"
+text_primary = "#e2e8f0"
+text_secondary = "#94a3b8"
+border_color = "#1e3a5f"
+bubble_user = "#1e40af"
+bubble_user_text = "#ffffff"
+bubble_assistant = "#111f35"
+bubble_assistant_text = "#e2e8f0"
+auth_card_bg = "rgba(17, 31, 53, 0.95)"
+input_bg = "#0d1b2a"
 
-# Dark Mode Palette Only
-primary = "#6366f1"
-primary_dark = "#4f46e5"
-accent = "#f87171"
-bg_gradient = "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)"
-card_bg = "rgba(30, 41, 59, 0.8)"
-text_main = "#f8fafc"
+# Enterprise Color Palette
+primary = "#1e40af"
+primary_dark = "#1e3a8a"
+accent = "#3b82f6"
+bg_gradient = "linear-gradient(135deg, #0a1628 0%, #0d1b2a 100%)"
+card_bg = "rgba(17, 31, 53, 0.85)"
+text_main = "#e2e8f0"
 text_muted = "#94a3b8"
-border = "rgba(255, 255, 255, 0.3)"
-input_bg_dark = "rgba(15, 23, 42, 0.6)"
+border = "rgba(30, 58, 95, 0.4)"
+input_bg_dark = "rgba(13, 27, 42, 0.8)"
 
 st.markdown("""
 <style>
@@ -242,6 +253,34 @@ st.markdown("""
     .stApp {{
         background: var(--bg-gradient);
         font-family: 'Inter', sans-serif;
+        padding-top: 0 !important;
+    }}
+    
+    /* Reduce top padding of main content */
+    .main .block-container {{
+        padding-top: 0.5rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 100% !important;
+    }}
+    
+    /* Remove extra spacing from header */
+    header[data-testid="stHeader"] {{
+        background-color: transparent !important;
+        display: none !important;
+    }}
+    
+    /* Hide the top right buttons/menu */
+    [data-testid="stToolbar"] {{
+        display: none !important;
+    }}
+    
+    /* Hide deploy button and other header elements */
+    .stDeployButton {{
+        display: none !important;
+    }}
+    
+    button[kind="header"] {{
+        display: none !important;
     }}
 
     /* Fix icon rendering issues (ligatures appearing as text) */
@@ -263,9 +302,9 @@ st.markdown("""
         text-indent: 0;
     }}
 
-    /* Sidebar Toggle Button - Premium Blue Circle */
+    /* Sidebar Toggle Button - Professional Blue */
     [data-testid="stSidebarCollapseButton"] {{
-        background-color: #2563eb !important;
+        background-color: #1e40af !important;
         color: white !important;
         border-radius: 50% !important;
         width: 44px !important;
@@ -275,9 +314,9 @@ st.markdown("""
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3) !important;
+        box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25) !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        border: 2px solid rgba(255, 255, 255, 0.2) !important;
+        border: 1px solid rgba(59, 130, 246, 0.3) !important;
         z-index: 999999 !important;
         position: relative !important;
         overflow: hidden !important;
@@ -287,7 +326,7 @@ st.markdown("""
 
     /* Also target the header button only if it's the chevron expand button */
     header[data-testid="stHeader"] button:first-of-type:not([data-testid="stStatusWidget"]) {{
-        background-color: #2563eb !important;
+        background-color: #1e40af !important;
         color: white !important;
         border-radius: 50% !important;
         width: 44px !important;
@@ -297,9 +336,9 @@ st.markdown("""
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3) !important;
+        box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25) !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        border: 2px solid rgba(255, 255, 255, 0.2) !important;
+        border: 1px solid rgba(59, 130, 246, 0.3) !important;
         position: relative !important;
         margin-left: 10px !important;
         z-index: 999999 !important;
@@ -309,9 +348,9 @@ st.markdown("""
 
     [data-testid="stSidebarCollapseButton"]:hover,
     header[data-testid="stHeader"] button:first-of-type:hover {{
-        background-color: #1d4ed8 !important;
-        transform: scale(1.1) !important;
-        box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.4) !important;
+        background-color: #1e3a8a !important;
+        transform: scale(1.05) !important;
+        box-shadow: 0 6px 16px rgba(30, 64, 175, 0.35) !important;
     }}
 
     /* Hide default Streamlit icons and text in both buttons */
@@ -365,7 +404,7 @@ st.markdown("""
     .profile-avatar {{
         width: 80px;
         height: 80px;
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
         border-radius: 50%;
         color: white;
         display: flex;
@@ -373,8 +412,9 @@ st.markdown("""
         justify-content: center;
         font-weight: 700;
         font-size: 1.8rem;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
         flex-shrink: 0;
+        border: 2px solid rgba(59, 130, 246, 0.2);
     }}
 
     .profile-info {{
@@ -404,6 +444,7 @@ st.markdown("""
         border-radius: 50%;
         display: inline-block;
         animation: pulse-dot 2s infinite;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
     }}
 
     @keyframes pulse-dot {{
@@ -412,23 +453,24 @@ st.markdown("""
             transform: scale(1);
         }}
         50% {{
-            opacity: 0.5;
+            opacity: 0.6;
             transform: scale(1.1);
         }}
     }}
 
-    /* Log Out Button - Red Styling */
+    /* Log Out Button - Professional Red */
     div[data-testid="stSidebar"] button[key="logout_btn"] {{
-        background-color: #ef4444 !important;
+        background-color: #dc2626 !important;
         color: white !important;
-        border: 1px solid #dc2626 !important;
+        border: 1px solid rgba(220, 38, 38, 0.3) !important;
         font-weight: 600 !important;
         transition: all 0.3s !important;
     }}
 
     div[data-testid="stSidebar"] button[key="logout_btn"]:hover {{
-        background-color: #dc2626 !important;
-        border-color: #b91c1c !important;
+        background-color: #b91c1c !important;
+        border-color: rgba(185, 28, 28, 0.4) !important;
+        box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25) !important;
     }}
 
     .auth-card {{
@@ -494,7 +536,7 @@ st.markdown("""
     /* Input Field Styling */
     .stTextInput input {{
         background-color: var(--input-bg) !important;
-        border: 1px solid var(--border) !important;
+        border: 1px solid rgba(30, 58, 95, 0.5) !important;
         border-radius: var(--radius-lg) !important;
         height: 52px !important;
         padding-left: 15px !important;
@@ -504,16 +546,22 @@ st.markdown("""
     }}
 
     .stTextInput input:focus {{
-        border-color: var(--primary) !important;
-        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1) !important;
-        background-color: white !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+        background-color: rgba(13, 27, 42, 0.9) !important;
         color: var(--text-main) !important;
     }}
     
     /* Chat Input Styling */
     .stChatInputContainer input {{
         color: var(--text-main) !important;
-        background-color: rgba(15, 23, 42, 0.6) !important;
+        background-color: rgba(13, 27, 42, 0.8) !important;
+        border: 1px solid rgba(30, 58, 95, 0.5) !important;
+    }}
+    
+    .stChatInputContainer input:focus {{
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
     }}
     
     .stChatInputContainer input::placeholder {{
@@ -632,25 +680,25 @@ st.markdown("""
     /* Card Component */
     .card {{
         background: var(--card-bg);
-        border: 1px solid var(--border);
+        border: 1px solid rgba(30, 58, 95, 0.4);
         border-radius: var(--radius-lg);
         padding: 24px;
         margin-bottom: 24px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        border-left: 5px solid var(--border);
+        border-left: 3px solid rgba(30, 58, 95, 0.5);
         position: relative;
         overflow: hidden;
     }}
 
     .card:hover {{
-        transform: translateY(-4px);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        border-color: var(--primary);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        border-left-color: #3b82f6;
     }}
 
     /* Priority Indicators */
-    .priority-high {{ border-left-color: #ef4444 !important; }}
+    .priority-high {{ border-left-color: #dc2626 !important; }}
     .priority-medium {{ border-left-color: #f59e0b !important; }}
     .priority-low {{ border-left-color: #3b82f6 !important; }}
 
@@ -667,8 +715,8 @@ st.markdown("""
     }}
 
     .tag-blue {{ background: rgba(59, 130, 246, 0.15) !important; color: #3b82f6 !important; border: 1px solid rgba(59, 130, 246, 0.3) !important; }}
-    .tag-green {{ background: rgba(34, 197, 94, 0.15) !important; color: #22c55e !important; border: 1px solid rgba(34, 197, 94, 0.3) !important; }}
-    .tag-red {{ background: rgba(239, 68, 68, 0.15) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.3) !important; }}
+    .tag-green {{ background: rgba(16, 185, 129, 0.15) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }}
+    .tag-red {{ background: rgba(220, 38, 38, 0.15) !important; color: #dc2626 !important; border: 1px solid rgba(220, 38, 38, 0.3) !important; }}
     .tag-orange {{ background: rgba(245, 158, 11, 0.15) !important; color: #f59e0b !important; border: 1px solid rgba(245, 158, 11, 0.3) !important; }}
 
     /* Sidebar Buttons - Using Native Streamlit Styling */
@@ -900,7 +948,7 @@ if not st.session_state.logged_in:
         st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
         footer_html = """
         <div class="auth-footer" style="padding-right: 150px;">
-            <p>🔒 Protected by Enterprise Grade Security</p>
+            <p>Protected by Enterprise Grade Security</p>
             <p>© 2026 HCLTech • ModernSaaS v2.5</p>
         </div>
         """
@@ -927,11 +975,13 @@ if not st.session_state.logged_in:
                     if result["success"]:
                         st.session_state.logged_in = True
                         st.session_state.user = result["user"]
+                        st.session_state.agent = None  # Clear old agent
+                        st.session_state.messages = []  # Clear old messages
                         st.query_params["user"] = result["user"]["username"]
                         add_notification(f"Welcome back, {result['user']['full_name']}!", type="success")
                         st.rerun()
                     else:
-                        st.error(f"❌ {result['message']}")
+                        st.error(f"{result['message']}")
 
         with auth_tab2:
             with st.form("register_form"):
@@ -953,18 +1003,18 @@ if not st.session_state.logged_in:
                     email_pattern = r"^[a-zA-Z0-9._%+-]+@hcltech\.ac\.in$"
                     
                     if not new_user or not new_pass or not full_name or not email or not new_confirm_pass:
-                        st.warning("⚠️ Please fill in all required fields.")
+                        st.warning("Please fill in all required fields.")
                     elif new_pass != new_confirm_pass:
-                        st.error("❌ Passwords do not match. Please try again.")
+                        st.error("Passwords do not match. Please try again.")
                     elif not re.match(email_pattern, email):
-                        st.error("❌ Email must be a valid @hcltech.ac.in address.")
+                        st.error("Email must be a valid @hcltech.ac.in address.")
                     else:
                         result = create_user(new_user, new_pass, full_name, email)
                         if result["success"]:
                             add_notification("Account created! Please log in.", type="success")
                             st.rerun()
                         else:
-                            st.error(f"❌ {result['message']}")
+                            st.error(f"{result['message']}")
 
     # Stop execution here if not logged in
     st.stop()
@@ -975,7 +1025,7 @@ if not st.session_state.logged_in:
 #                    HELPER FUNCTIONS
 # =========================================================
 
-@st.dialog("📅 Meeting Details")
+@st.dialog("Meeting Details")
 def show_meeting_details(meeting):
     st.markdown(f"<h3 style='color:var(--text-primary);'>{meeting['department']} Department</h3>", unsafe_allow_html=True)
     st.markdown(f"<p style='color:var(--text-secondary);'><b>Meeting ID:</b> <code style='color:var(--text-main); background:var(--input-bg);'>{meeting['meeting_id']}</code></p>", unsafe_allow_html=True)
@@ -999,7 +1049,7 @@ def show_meeting_details(meeting):
     if st.button("Close Dialog", use_container_width=True):
         st.rerun()
 
-@st.dialog("🎫 Ticket Details")
+@st.dialog("Ticket Details")
 def show_ticket_details(ticket):
     st.markdown(f"<h3 style='color:var(--text-primary);'>{ticket['ticket_id']}</h3>", unsafe_allow_html=True)
     st.markdown(f"<p style='color:var(--text-secondary);'><b>Issue:</b> <span style='color:var(--text-main);'>{ticket['issue']}</span></p>", unsafe_allow_html=True)
@@ -1031,15 +1081,42 @@ def show_ticket_details(ticket):
 # =========================================================
 
 # -------------------- HEADER --------------------
-main_header_html = "<div class='main-header'><h1>🤖 HCLTech Enterprise Assistant</h1>" \
+st.markdown("""
+<style>
+    .main-header {
+        text-align: center;
+        padding: 1.5rem 0 1rem 0;
+        margin-bottom: 0.5rem;
+    }
+    .main-header h1 {
+        font-size: 3rem;
+        margin: 0 0 0.5rem 0;
+        font-weight: 800;
+        color: #ffffff !important;
+        letter-spacing: -0.5px;
+    }
+    .main-header p {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+        margin: 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+main_header_html = "<div class='main-header'><h1>HCLTech Enterprise Assistant</h1>" \
                    "<p>AI-Powered Support • Instant Issue Resolution • Smart Scheduling</p></div>"
 st.markdown(main_header_html, unsafe_allow_html=True)
 
 
 # -------------------- TABS --------------------
-# Remove blue tab selection color
+# Remove blue tab selection color and optimize spacing
 st.markdown("""
 <style>
+    [data-baseweb="tab-list"] {
+        gap: 0;
+        margin-bottom: 1rem !important;
+        padding-top: 0 !important;
+    }
     [data-baseweb="tab-list"] button[aria-selected="true"] {
         color: var(--text-main) !important;
         border-bottom-color: transparent !important;
@@ -1047,10 +1124,13 @@ st.markdown("""
     [data-baseweb="tab-list"] button[aria-selected="true"]:after {
         background-color: transparent !important;
     }
+    [data-baseweb="tab-panel"] {
+        padding-top: 1rem !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["💬 Chat Assistant", "📅 HR Meetings", "🎫 IT Tickets"])
+tab1, tab2, tab3 = st.tabs(["Chat Assistant", "HR Meetings", "IT Tickets"])
 
 # ==================== TAB 1: CHAT ASSISTANT ====================
 with tab1:
@@ -1064,27 +1144,27 @@ with tab1:
     </style>
     """, unsafe_allow_html=True)
     
-    st.subheader(f"👋 Hi, {username_display}!")
+    st.subheader(f"Hi, {username_display}!")
     
     # -------- SESSION STATE --------
     if "messages" not in st.session_state:
         st.session_state.messages = []
     
-    if "agent" not in st.session_state:
-        with st.spinner("🚀 Initializing secure enterprise environment..."):
-            st.session_state.agent = get_agent()
+    if "agent" not in st.session_state or st.session_state.agent is None:
+        with st.spinner("Initializing secure enterprise environment..."):
+            st.session_state.agent = get_agent(user_info=st.session_state.user)
     
     # -------- CHAT AREA (SCROLLABLE) --------
-    # Dynamic height based on whether there are messages
-    chat_height = 150 if not st.session_state.messages else 400
+    # Dynamic height based on whether there are messages - optimized for laptop screens
+    chat_height = 200 if not st.session_state.messages else 500
     chat_container = st.container(height=chat_height, border=False)
     
     with chat_container:
         if not st.session_state.messages:
             st.markdown("""
-            <div style="text-align: center; padding: 20px 40px; color: var(--text-secondary);">
-                <h3 style="color: var(--text-primary);">How can I help you today?</h3>
-                <p>I can help you schedule meetings, report IT issues, or answer company queries.</p>
+            <div style="text-align: center; padding: 30px 40px; color: var(--text-secondary);">
+                <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">How can I help you today?</h3>
+                <p style="margin: 0;">I can help you schedule meetings, report IT issues, or answer company queries.</p>
             </div>
             """, unsafe_allow_html=True)
         else:
@@ -1105,16 +1185,16 @@ with tab1:
                     icon = ""
                     if "issue" in content.lower() or "sorry" in content.lower():
                         extra_class = "status-warning"
-                        icon = "⚠️"
+                        icon = "!"
                     elif "schedule" in content.lower() or "created" in content.lower() or "confirmed" in content.lower():
                         extra_class = "status-success"
-                        icon = "✅"
+                        icon = "+"
                     else:
                         extra_class = "status-info"
-                        icon = "ℹ️"
+                        icon = "i"
 
                     # If it's a standard simple response, just use bubble, otherwise add status box look
-                    if len(content) < 150 and (icon != "ℹ️"):
+                    if len(content) < 150 and (icon != "i"):
                         st.markdown(f"""
                         <div style="display: flex; justify-content: flex-start; margin-bottom: 10px;">
                             <div class="chat-bubble assistant-bubble" style="background: var(--card-bg); border: 1px solid var(--border-color);">
@@ -1134,7 +1214,7 @@ with tab1:
                         """, unsafe_allow_html=True)
 
         if not os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY") == "your_actual_key_here":
-            st.warning("⚠️ **AI Setup Required**")
+            st.warning("**AI Setup Required**")
             st.markdown(textwrap.dedent("""
                 AI features like meeting scheduling and ticket resolution are currently disabled.
                 
@@ -1163,7 +1243,7 @@ with tab1:
     
     # Handle agent response separately (OUTSIDE chat container)
     if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
-        with st.spinner("⚡ Thinking..."):
+        with st.spinner("Thinking..."):
             try:
                 last_user_msg = st.session_state.messages[-1]["content"]
                 result = st.session_state.agent.invoke(last_user_msg)
@@ -1177,9 +1257,9 @@ with tab1:
                 # --- NEW: Trigger Browser Notification for Agent Update ---
                 msg_preview = response_text[:100] + "..." if len(response_text) > 100 else response_text
                 alert_type = "info"
-                if "✅" in response_text or "confirmed" in response_text.lower() or "scheduled" in response_text.lower():
+                if "confirmed" in response_text.lower() or "scheduled" in response_text.lower():
                     alert_type = "success"
-                elif "⚠️" in response_text or "error" in response_text.lower() or "failed" in response_text.lower():
+                elif "error" in response_text.lower() or "failed" in response_text.lower():
                     alert_type = "warning"
                 
                 add_notification(f"AI Update: {msg_preview}", type=alert_type)
@@ -1195,12 +1275,17 @@ with tab1:
 
 # ==================== TAB 2: HR MEETINGS ====================
 with tab2:
-    meetings_data = get_all_meetings()
+    # Get user-specific meetings
+    user_id = st.session_state.user.get('id') if st.session_state.user else None
+    if user_id:
+        meetings_data = get_user_meetings(user_id)
+    else:
+        meetings_data = []
     
     if meetings_data:
         col_header, col_export = st.columns([3, 1])
         with col_header:
-            st.subheader("📅 Meeting Scheduler Dashboard")
+            st.subheader("Meeting Scheduler Dashboard")
         with col_export:
             st.download_button(
                 label="📥 Download JSON",
@@ -1251,12 +1336,17 @@ with tab2:
 
 # ==================== TAB 3: TICKETS ====================
 with tab3:
-    tickets_data = get_all_tickets()
+    # Get user-specific tickets
+    user_id = st.session_state.user.get('id') if st.session_state.user else None
+    if user_id:
+        tickets_data = get_user_tickets(user_id)
+    else:
+        tickets_data = []
     
     if tickets_data:
         col_header, col_export = st.columns([3, 1])
         with col_header:
-            st.subheader("🎫 IT Support Dashboard")
+            st.subheader("IT Support Dashboard")
         with col_export:
             st.download_button(
                 label="📥 Download JSON",
@@ -1288,7 +1378,7 @@ with tab3:
                               f"<span class='tag {tag_class}'>{priority} Priority</span></div>" \
                               f"<p style='margin-top:15px; font-weight:600; color:var(--text-primary); font-size:1.1rem;'>{ticket['issue']}</p>" \
                               f"<div style='display:flex; align-items:center; gap:8px; margin-bottom:15px;'>" \
-                              f"<span style='font-size:0.85rem; padding:4px 8px; background:rgba(255,255,255,0.05); border-radius:4px;'>👤 {ticket['assigned_to']}</span></div></div>"
+                              f"<span style='font-size:0.85rem; padding:4px 8px; background:rgba(255,255,255,0.05); border-radius:4px;'>{ticket['assigned_to']}</span></div></div>"
                 st.markdown(ticket_html, unsafe_allow_html=True)
                 
                 # Ticket Footer with Functional Button

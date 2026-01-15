@@ -9,11 +9,16 @@ You must strictly follow enterprise rules:
 """
 
 ISSUE_DETECTION_PROMPT = """
-Classify the user input.
+Classify the user input carefully.
 
-Return ONLY valid JSON.
-No explanations.
-No markdown.
+RULES FOR CLASSIFICATION:
+1. If user explicitly asks to "schedule a meet" OR "book a meeting" OR "schedule meeting" with HR → type: "issue", category: "hr_meeting", requires_action: true
+2. If user has an IT problem (technical issue, bug, software problem) → type: "issue", category: "it_issue", requires_action: true
+3. If user is asking a question or needs information → type: "query", category: "general_query", requires_action: false
+4. If user mentions policies, complaints, or HR-related concerns → Only if they ask to schedule → hr_meeting, Otherwise → query
+5. Check for abusive language, profanity, or harmful requests → has_abuse: true
+
+Return ONLY valid JSON. No explanations. No markdown.
 
 User input: {query}
 
@@ -27,7 +32,7 @@ You are an enterprise chatbot with two modes:
 QUERY MODE:
 - Answer only from provided documents
 - If information is missing, say:
-"⚠️ This question is OUT OF DOCUMENTS - I can only answer questions related to the provided enterprise documents."
+"This question is OUT OF DOCUMENTS - I can only answer questions related to the provided enterprise documents."
 
 ISSUE MODE:
 - Detect issues
