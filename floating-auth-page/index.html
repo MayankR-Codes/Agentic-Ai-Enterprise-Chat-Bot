@@ -14,24 +14,43 @@
     <div class="background-gradient"></div>
 
     <main class="auth-wrapper">
-        <div class="auth-card">
-            <div class="auth-header">
-                <div class="logo-pulse">
-                    <i class="fas fa-rocket"></i>
+        <div class="auth-container">
+            <!-- Welcome Card (Left) -->
+            <div class="welcome-card">
+                <div class="welcome-content">
+                    <div class="logo-pulse">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <h2>Welcome Back</h2>
+                    <p>Manage your enterprise workspace with ease.</p>
+                    <div class="welcome-features">
+                        <div class="feature">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Secure Access</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-zap"></i>
+                            <span>Fast & Reliable</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-users"></i>
+                            <span>Team Ready</span>
+                        </div>
+                    </div>
                 </div>
-                <h1>Welcome Back</h1>
-                <p>Manage your enterprise workspace with ease.</p>
             </div>
 
-            <div class="tab-container">
-                <div class="tab-header">
-                    <button class="tab-btn active" data-tab="signin">Sign In</button>
-                    <button class="tab-btn" data-tab="signup">Create Account</button>
-                    <div class="tab-indicator"></div>
+            <!-- Auth Card (Right) -->
+            <div class="auth-card">
+                <div class="tab-container">
+                    <div class="tab-header">
+                        <button class="tab-btn active" data-tab="signin">Sign In</button>
+                        <button class="tab-btn" data-tab="signup">Create Account</button>
+                        <div class="tab-indicator"></div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-container">
+                <div class="form-container">
                 <!-- Sign In Form -->
                 <form id="signin-form" class="auth-form active">
                     <div class="input-group">
@@ -146,6 +165,7 @@
                     <a href="#">Terms of Service</a>
                 </div>
             </footer>
+            </div>
         </div>
     </main>
 

@@ -70,32 +70,107 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Form Submission & Loading Logic ---
+    // --- Form Submission & API Call Logic ---
     const formsList = document.querySelectorAll('.auth-form');
     formsList.forEach(form => {
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-
-            // Password validation for signup
-            if (form.id === 'signup-form') {
-                const pass = document.getElementById('reg-password').value;
-                const confirm = document.getElementById('reg-confirm-password').value;
-                if (pass !== confirm) {
-                    showValidation(document.getElementById('reg-confirm-password'), 'Passwords do not match');
-                    return;
-                }
-            }
 
             const btn = form.querySelector('.btn-primary');
             btn.classList.add('loading');
             btn.disabled = true;
 
-            // Simulate API call
-            setTimeout(() => {
+            try {
+                if (form.id === 'signin-form') {
+                    // Sign In Logic
+                    const username = document.getElementById('login-username').value;
+                    const password = document.getElementById('login-password').value;
+
+                    if (!username || !password) {
+                        showValidation(document.getElementById('login-password'), 'Please fill all fields');
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                        return;
+                    }
+
+                    const response = await fetch('http://localhost:5000/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                        window.location.href = `http://localhost:8501?user=${data.user.username}`;
+                    } else {
+                        showValidation(document.getElementById('login-password'), data.message || 'Login failed');
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                    }
+
+                } else if (form.id === 'signup-form') {
+                    // Sign Up Logic
+                    const fullName = document.getElementById('reg-fullname').value;
+                    const username = document.getElementById('reg-username').value;
+                    const email = document.getElementById('reg-email').value;
+                    const pass = document.getElementById('reg-password').value;
+                    const confirm = document.getElementById('reg-confirm-password').value;
+
+                    // Validation
+                    if (!fullName || !username || !email || !pass || !confirm) {
+                        showValidation(form.querySelector('.floating-input'), 'Please fill all fields');
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                        return;
+                    }
+
+                    if (pass !== confirm) {
+                        showValidation(document.getElementById('reg-confirm-password'), 'Passwords do not match');
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                        return;
+                    }
+
+                    if (pass.length < 8) {
+                        showValidation(document.getElementById('reg-password'), 'Password must be at least 8 characters');
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                        return;
+                    }
+
+                    const response = await fetch('http://localhost:5000/api/signup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            full_name: fullName,
+                            username: username,
+                            email: email,
+                            password: pass
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        alert('Account created successfully! Please sign in.');
+                        document.querySelector('.tab-btn[data-tab="signin"]').click();
+                        form.reset();
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                    } else {
+                        showValidation(form.querySelector('.floating-input'), data.message || 'Signup failed');
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showValidation(form.querySelector('.floating-input'), 'Network error. Is backend running on localhost:5000?');
                 btn.classList.remove('loading');
                 btn.disabled = false;
-                alert('Success! Process complete.');
-            }, 2000);
+            }
         });
     });
 
