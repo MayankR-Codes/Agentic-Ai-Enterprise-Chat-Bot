@@ -181,10 +181,12 @@ class EnterpriseAgent:
                 )
             }
 
-        context = "\n---\n".join(d.page_content[:1000] for d in docs[:3])
-        sources = ", ".join(
-            d.metadata.get("source", "Unknown") for d in docs[:3]
-        )
+        # Build context with page information for each chunk
+        context_with_pages = ""
+        for idx, d in enumerate(docs[:3], 1):
+            page = d.metadata.get("page", "N/A")
+            content = d.page_content[:800]
+            context_with_pages += f"(Page {page})\n{content}\n\n---\n\n"
 
         answer_prompt = f"""
 You are an expert enterprise assistant. Provide clear, well-structured answers using the context provided.
@@ -194,18 +196,25 @@ INSTRUCTIONS:
 2. Format your response as follows:
    - Start with a brief summary paragraph (2-3 sentences) that answers the main question
    - Then provide key details in bullet points below
-3. Use bullet points to organize specific information, statistics, or multiple aspects
+3. FOR EACH FACT IN BULLET POINTS: Include [Page X] citation showing the page number where that information comes from
 4. Keep each bullet point focused on one key piece of information
 5. Be professional and informative
 
+CITATION FORMAT:
+- Add [Page X] at the end of each bullet point with the actual page number
+- Example: "Total complaints reported: 44 [Page 12]"
+- Example: "Percentage of female employees: 0.09% [Page 3]"
+- Example: "Policy details in Corporate Governance Report [Page 8]"
+
 RULES:
 - Do NOT use outside knowledge
-- Always start with a summary paragraph, then use bullet points for details
+- ALWAYS include [Page X] citations in bullet points for all factual statements
+- Start with a summary paragraph, then use bullet points with page citations
 - If the answer is completely missing from context, reply exactly:
 "This question is OUT OF DOCUMENTS - I can only answer questions related to the provided enterprise documents."
 
-Context:
-{context}
+Context with Page Numbers:
+{context_with_pages}
 
 Question: {query}
 
