@@ -732,6 +732,17 @@ st.markdown("""
         display: none !important;
     }}
 
+    /* Metric Value - Make it visible with white color */
+    [data-testid="stMetricValue"] {{
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }}
+
+    /* Metric Label */
+    [data-testid="stMetricLabel"] {{
+        color: var(--text-muted) !important;
+    }}
+
 </style>
 
 <script>

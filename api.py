@@ -45,14 +45,21 @@ def api_signup():
     """Handle signup requests from the frontend."""
     try:
         data = request.json
-        username = data.get('username')
-        password = data.get('password')
-        full_name = data.get('full_name')
-        email = data.get('email')
         
+        # Validate request data
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+        
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        full_name = data.get('full_name', '').strip()
+        email = data.get('email', '').strip()
+        
+        # Validate all fields are present
         if not all([username, password, full_name, email]):
             return jsonify({'success': False, 'message': 'All fields are required'}), 400
         
+        # Call backend to create user
         result = create_user(username, password, full_name, email)
         
         if result['success']:
@@ -67,7 +74,8 @@ def api_signup():
             }), 400
             
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        print(f"Signup error: {str(e)}")
+        return jsonify({'success': False, 'message': 'Server error occurred'}), 500
 
 
 @app.route('/api/health', methods=['GET'])

@@ -27,6 +27,18 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update forms with fade effect
             forms.forEach(form => {
                 form.classList.remove('active');
+                // Clear all error messages when switching tabs
+                form.querySelectorAll('.validation-msg').forEach(msg => msg.remove());
+                form.querySelectorAll('.field-wrapper').forEach(wrapper => wrapper.style.borderColor = '');
+                
+                // Hide forgot password link when switching to sign in tab
+                if (targetTab === 'signin') {
+                    const forgotPasswordContainer = document.getElementById('forgot-password-container');
+                    if (forgotPasswordContainer) {
+                        forgotPasswordContainer.style.display = 'none';
+                    }
+                }
+                
                 if (form.id === `${targetTab}-form`) {
                     setTimeout(() => form.classList.add('active'), 50);
                 }
@@ -105,6 +117,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         localStorage.setItem('user', JSON.stringify(data.user));
                         window.location.href = `http://localhost:8501?user=${data.user.username}`;
                     } else {
+                        // Show forgot password link after failed login
+                        const forgotPasswordContainer = document.getElementById('forgot-password-container');
+                        if (forgotPasswordContainer) {
+                            forgotPasswordContainer.style.display = 'flex';
+                        }
                         showValidation(document.getElementById('login-password'), data.message || 'Login failed');
                         btn.classList.remove('loading');
                         btn.disabled = false;
@@ -112,11 +129,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 } else if (form.id === 'signup-form') {
                     // Sign Up Logic
-                    const fullName = document.getElementById('reg-fullname').value;
-                    const username = document.getElementById('reg-username').value;
-                    const email = document.getElementById('reg-email').value;
+                    const fullName = document.getElementById('reg-fullname').value.trim();
+                    const username = document.getElementById('reg-username').value.trim();
+                    const email = document.getElementById('reg-email').value.trim();
                     const pass = document.getElementById('reg-password').value;
                     const confirm = document.getElementById('reg-confirm-password').value;
+
+                    // Clear any previous errors
+                    form.querySelectorAll('.validation-msg').forEach(msg => msg.remove());
+                    form.querySelectorAll('.field-wrapper').forEach(wrapper => wrapper.style.borderColor = '');
 
                     // Validation
                     if (!fullName || !username || !email || !pass || !confirm) {
@@ -140,30 +161,38 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
 
-                    const response = await fetch('http://localhost:5000/api/signup', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            full_name: fullName,
-                            username: username,
-                            email: email,
-                            password: pass
-                        })
-                    });
+                    try {
+                        const response = await fetch('http://localhost:5000/api/signup', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                full_name: fullName,
+                                username: username,
+                                email: email,
+                                password: pass
+                            })
+                        });
 
-                    const data = await response.json();
+                        const data = await response.json();
 
-                    if (data.success) {
-                        alert('Account created successfully! Please sign in.');
-                        document.querySelector('.tab-btn[data-tab="signin"]').click();
-                        form.reset();
-                        btn.classList.remove('loading');
-                        btn.disabled = false;
-                    } else {
-                        showValidation(form.querySelector('.floating-input'), data.message || 'Signup failed');
-                        btn.classList.remove('loading');
-                        btn.disabled = false;
+                        // Only show success if BOTH response is OK (2xx status) AND data.success is true
+                        if (response.ok && data.success === true) {
+                            // Success - show alert and redirect to sign in
+                            alert('Account created successfully! Please sign in.');
+                            document.querySelector('.tab-btn[data-tab="signin"]').click();
+                            form.reset();
+                        } else {
+                            // Error - show the error message
+                            const errorMsg = data.message || 'Signup failed. Please try again.';
+                            showValidation(document.getElementById('reg-username'), errorMsg);
+                        }
+                    } catch (fetchError) {
+                        console.error('Fetch error:', fetchError);
+                        showValidation(form.querySelector('.floating-input'), 'Network error. Is the backend running on localhost:5000?');
                     }
+
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
                 }
             } catch (error) {
                 console.error('Error:', error);

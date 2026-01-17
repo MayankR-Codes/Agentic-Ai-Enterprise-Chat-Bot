@@ -15,10 +15,34 @@ An **Agentic AI Chatbot** that intelligently handles both **informational querie
 | 💬 **Chat History** | Maintains conversation context across interactions |
 | 📊 **Dashboard** | View all tickets and meetings |
 | 🔐 **Audit Trail** | Logs all actions with user tracking |
+| 🛡️ **Enhanced Security** | Improved authentication with case-insensitive usernames & password validation |
+| ✅ **Input Validation** | Comprehensive input validation for all user-facing APIs |
+| 🎨 **Enhanced UI** | Improved metrics visibility with better contrast & styling |
 
 ---
 
-## 🛠️ **Tech Stack**
+## � **Recent Updates (v1.1)**
+
+### **Authentication Security Enhancements** 🔐
+- **Case-insensitive usernames**: Added `COLLATE NOCASE` to username field for consistent login experience
+- **Password validation**: Minimum 8-character password requirement
+- **Duplicate user detection**: Better error handling for duplicate username registrations
+- **Improved error messages**: More descriptive feedback for login/signup failures
+
+### **API Input Validation** ✅
+- **Request validation**: Enhanced `/api/signup` endpoint with input sanitization
+- **Field validation**: All required fields checked before processing
+- **Error handling**: Improved exception handling with meaningful error messages
+- **Type checking**: Email and username format validation
+
+### **Frontend UI Improvements** 🎨
+- **Metrics visibility**: Enhanced metric value visibility with white color and better contrast
+- **Label styling**: Improved metric labels with muted text colors
+- **Dark theme support**: Better styling for dark mode metrics display
+
+---
+
+## �🛠️ **Tech Stack**
 
 - **LLM**: Google Gemini 1.5 Flash (via `langchain-google-genai`)
 - **RAG Engine**: LangChain + FAISS Vector DB + HuggingFace Embeddings
@@ -115,6 +139,38 @@ Open browser at `http://localhost:8501`
 ---
 
 ## 🎯 **How It Works**
+
+### **Authentication Flow** (Updated v1.1)
+
+**User Registration**:
+```python
+# Backend validation in Backend/auth.py
+- Check if all fields provided (username, password, full_name, email)
+- Validate password length >= 8 characters
+- Check for duplicate username (case-insensitive)
+- Hash password using bcrypt
+- Store in SQLite with COLLATE NOCASE
+```
+
+**User Login**:
+```python
+# Backend/auth.py create_user() & login_user()
+- Validate username and password provided
+- Query user (case-insensitive due to COLLATE NOCASE)
+- Verify password hash
+- Return user profile on success
+- Descriptive errors on failure
+```
+
+**API Endpoint** (`/api/signup`):
+```python
+# api.py api_signup()
+- Validate JSON data provided
+- Strip and validate username, password, full_name, email
+- Check all fields present
+- Create user via Backend/auth.py
+- Return JSON response with success status
+```
 
 ### **Query Flow**
 ```
