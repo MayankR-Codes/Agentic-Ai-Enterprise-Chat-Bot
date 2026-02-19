@@ -37,6 +37,8 @@ if "pending_alerts" not in st.session_state:
     st.session_state.pending_alerts = []
 if "show_activity_log" not in st.session_state:
     st.session_state.show_activity_log = False
+if "account_created" not in st.session_state:
+    st.session_state.account_created = False
 
 def add_notification(message, type="info"):
     """Centralized notification handler (Toast + History + Browser Push)"""
@@ -111,13 +113,13 @@ with st.sidebar:
         
         # 1. History
         st.markdown("### History")
-        st.metric("Messages", len(st.session_state.get("messages", [])))
+        user_message_count = len([m for m in st.session_state.get("messages", []) if m.get("role") == "user"])
+        st.metric("Messages", user_message_count)
         
         st.divider()
 
         # 2. Activity Log
-        log_label = f"Activity Log {'-' if st.session_state.show_activity_log else '+'}"
-        if st.button(log_label, use_container_width=True, key="activity_log_toggle"):
+        if st.button("Activity Log", use_container_width=True, key="activity_log_toggle"):
             st.session_state.show_activity_log = not st.session_state.show_activity_log
             st.rerun()
 
@@ -130,7 +132,7 @@ with st.sidebar:
                     for note in st.session_state.notification_history:
                         color = "#10b981" if note["type"] == "success" else "#3b82f6"
                         if note["type"] == "error": color = "#ef4444"
-                        if note["type"] == "warning": color = "#f59e0b"
+                        if note["type"] == "warning": color = "#ef4444"
                         
                         item_html = f"<div style='border-left: 3px solid {color}; padding-left: 10px; margin-bottom: 10px; font-size: 0.85rem;'>" \
                                     f"<span style='color: var(--text-muted); font-size: 0.75rem;'>{note['time']}</span><br>" \
@@ -258,8 +260,8 @@ st.markdown("""
     
     /* Reduce top padding of main content */
     .main .block-container {{
-        padding-top: 0.5rem !important;
-        padding-bottom: 2rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 1.5rem !important;
         max-width: 100% !important;
     }}
     
@@ -318,7 +320,9 @@ st.markdown("""
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         border: 1px solid rgba(59, 130, 246, 0.3) !important;
         z-index: 999999 !important;
-        position: relative !important;
+        position: fixed !important;
+        top: 10px !important;
+        left: 10px !important;
         overflow: hidden !important;
         opacity: 1 !important;
         visibility: visible !important;
@@ -510,27 +514,38 @@ st.markdown("""
         100% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }}
     }}
 
-    /* Tab Styling Overrides */
+    /* Tab Styling Overrides - Blue Only */
     .stTabs [data-baseweb="tab-list"] {{
-        border-bottom: 2px solid var(--border);
-        gap: 0;
-        margin-bottom: 25px;
+        border-bottom: 2px solid #3b82f6 !important;
+        gap: 0 !important;
+        margin-bottom: 25px !important;
+        background: transparent !important;
     }}
 
     .stTabs [data-baseweb="tab"] {{
-        flex: 1;
-        transition: all 0.3s;
+        flex: 1 !important;
+        transition: all 0.3s !important;
         border: none !important;
         background: transparent !important;
         padding: 12px !important;
         height: 50px !important;
-        color: var(--text-muted) !important;
+        color: #94a3b8 !important;
         font-weight: 600 !important;
     }}
 
     .stTabs [aria-selected="true"] {{
-        color: var(--primary) !important;
-        border-bottom: 2px solid var(--primary) !important;
+        color: #3b82f6 !important;
+        border-bottom: 2px solid #3b82f6 !important;
+        background: transparent !important;
+    }}
+    
+    .stTabs [aria-selected="true"]:hover {{
+        color: #3b82f6 !important;
+        border-bottom: 2px solid #3b82f6 !important;
+    }}
+    
+    .stTabs [data-baseweb="tab"]:hover {{
+        color: #cbd5e1 !important;
     }}
 
     /* Input Field Styling */
@@ -630,6 +645,16 @@ st.markdown("""
         color: var(--text-main) !important;
         font-family: 'Inter', sans-serif !important;
         font-weight: 700 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }}
+    
+    h2 {{
+        margin: 0.3rem 0 0.2rem 0 !important;
+    }}
+    
+    h3 {{
+        margin: 0.2rem 0 0.1rem 0 !important;
     }}
 
     p, span, label, li {{
@@ -699,7 +724,7 @@ st.markdown("""
 
     /* Priority Indicators */
     .priority-high {{ border-left-color: #dc2626 !important; }}
-    .priority-medium {{ border-left-color: #f59e0b !important; }}
+    .priority-medium {{ border-left-color: #ef4444 !important; }}
     .priority-low {{ border-left-color: #3b82f6 !important; }}
 
     /* Tag Component */
@@ -717,7 +742,7 @@ st.markdown("""
     .tag-blue {{ background: rgba(59, 130, 246, 0.15) !important; color: #3b82f6 !important; border: 1px solid rgba(59, 130, 246, 0.3) !important; }}
     .tag-green {{ background: rgba(16, 185, 129, 0.15) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }}
     .tag-red {{ background: rgba(220, 38, 38, 0.15) !important; color: #dc2626 !important; border: 1px solid rgba(220, 38, 38, 0.3) !important; }}
-    .tag-orange {{ background: rgba(245, 158, 11, 0.15) !important; color: #f59e0b !important; border: 1px solid rgba(245, 158, 11, 0.3) !important; }}
+    .tag-orange {{ background: rgba(239, 68, 68, 0.15) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.3) !important; }}
 
     /* Sidebar Buttons - Using Native Streamlit Styling */
 
@@ -741,6 +766,38 @@ st.markdown("""
     /* Metric Label */
     [data-testid="stMetricLabel"] {{
         color: var(--text-muted) !important;
+    }}
+
+    /* Form Container - Remove overlapping backgrounds */
+    [data-testid="stForm"] {{
+        background: transparent !important;
+    }}
+    
+    [data-testid="stForm"]::before,
+    [data-testid="stForm"]::after {{
+        display: none !important;
+    }}
+    
+    /* Remove any form overlays or progress bars */
+    form {{
+        background: transparent !important;
+        position: relative !important;
+    }}
+    
+    form::before,
+    form::after {{
+        display: none !important;
+    }}
+    
+    /* Text input focus state - red only */
+    .stTextInput input::before,
+    .stTextInput input::after {{
+        display: none !important;
+    }}
+    
+    /* Override any multi-color backgrounds on form elements */
+    [data-testid="stForm"] > div {{
+        background: transparent !important;
     }}
 
 </style>
@@ -874,14 +931,19 @@ if not st.session_state.logged_in:
         .stTabs [data-baseweb="tab-list"] {
             gap: 0;
             background: transparent;
-            border-bottom: 2px solid rgba(100, 116, 139, 0.3);
+            border-bottom: 2px solid #3b82f6;
+        }
+        .stTabs [data-baseweb="tab"] {
+            transition: all 0.3s !important;
+            border-bottom: none !important;
         }
         .stTabs [aria-selected="true"] {
-            color: #ef4444 !important;
-            border-bottom: 3px solid #ef4444 !important;
+            color: #3b82f6 !important;
+            border-bottom: 3px solid #3b82f6 !important;
         }
         .stTabs [aria-selected="false"] {
             color: #94a3b8 !important;
+            border-bottom: none !important;
         }
         .stTextInput > div > div > input,
         .stTextInput input {
@@ -890,21 +952,25 @@ if not st.session_state.logged_in:
             color: #f1f5f9 !important;
             border-radius: 10px !important;
             padding: 12px 16px !important;
+            font-size: 16px !important;
+            text-align: left !important;
+            letter-spacing: normal !important;
         }
         .stTextInput > div > div > input::placeholder,
         .stTextInput input::placeholder {
             color: #64748b !important;
+            text-align: left !important;
         }
         .stTextInput > div > div > input:focus,
         .stTextInput input:focus {
             background: rgba(15, 23, 42, 0.5) !important;
-            border: 1px solid #ef4444 !important;
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
-            color: #64748b !important;
+            border: 1px solid #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+            color: #ffffff !important;
         }
         .stTextInput > div > div > input:active,
         .stTextInput input:active {
-            color: #64748b !important;
+            color: #ffffff !important;
         }
         /* Auth Page Buttons - Using Native Streamlit Styling */
         .auth-footer {
@@ -922,6 +988,19 @@ if not st.session_state.logged_in:
             /* Hide desktop columns and stack vertically */
             [data-testid="column"] {
                 width: 100% !important;
+            }
+            
+            /* Mobile Input Field Fix */
+            .stTextInput input {
+                font-size: 16px !important;
+                padding: 14px 16px !important;
+                height: 50px !important;
+                text-align: left !important;
+            }
+            
+            .stTextInput input::placeholder {
+                text-align: left !important;
+                opacity: 0.7 !important;
             }
             
             /* Ensure footer moves to bottom on mobile */
@@ -944,6 +1023,12 @@ if not st.session_state.logged_in:
     </style>
     """
     st.markdown(auth_theme, unsafe_allow_html=True)
+    
+    # Show success message if account was just created
+    if st.session_state.get('account_created', False):
+        st.success("✅ Account created successfully! Please log in with your credentials.")
+        # Clear the flag but keep it visible for this session
+        st.session_state.account_created = False
     
     # Side-by-side layout
     col_left, col_right = st.columns(2)
@@ -1022,6 +1107,8 @@ if not st.session_state.logged_in:
                     else:
                         result = create_user(new_user, new_pass, full_name, email)
                         if result["success"]:
+                            # Store that account was created in session state
+                            st.session_state.account_created = True
                             add_notification("Account created! Please log in.", type="success")
                             st.rerun()
                         else:
@@ -1068,7 +1155,7 @@ def show_ticket_details(ticket):
     
     col_a, col_b = st.columns(2)
     priority = ticket.get('priority', 'Medium')
-    tag_color = "#ef4444" if priority == "High" else ("#f59e0b" if priority == "Medium" else "#3b82f6")
+    tag_color = "#ef4444" if priority == "High" else ("#ef4444" if priority == "Medium" else "#3b82f6")
     
     with col_a:
         st.markdown(f"<p style='color:var(--text-primary);'><b>Priority:</b> <span style='color:{tag_color}; font-weight:bold;'>{priority}</span></p>", unsafe_allow_html=True)
@@ -1096,19 +1183,19 @@ st.markdown("""
 <style>
     .main-header {
         text-align: center;
-        padding: 1.5rem 0 1rem 0;
-        margin-bottom: 0.5rem;
+        padding: 0.5rem 0 0.5rem 0;
+        margin-bottom: 0.2rem;
     }
     .main-header h1 {
-        font-size: 3rem;
-        margin: 0 0 0.5rem 0;
+        font-size: 2.5rem;
+        margin: 0.2rem 0 0.3rem 0;
         font-weight: 800;
         color: #ffffff !important;
         letter-spacing: -0.5px;
     }
     .main-header p {
         color: var(--text-muted);
-        font-size: 1.1rem;
+        font-size: 0.95rem;
         margin: 0;
     }
 </style>
@@ -1124,9 +1211,10 @@ st.markdown(main_header_html, unsafe_allow_html=True)
 st.markdown("""
 <style>
     [data-baseweb="tab-list"] {
-        gap: 0;
-        margin-bottom: 1rem !important;
+        gap: 0 !important;
+        margin-bottom: 0.5rem !important;
         padding-top: 0 !important;
+        margin-top: -0.5rem !important;
     }
     [data-baseweb="tab-list"] button[aria-selected="true"] {
         color: var(--text-main) !important;
@@ -1136,7 +1224,7 @@ st.markdown("""
         background-color: transparent !important;
     }
     [data-baseweb="tab-panel"] {
-        padding-top: 1rem !important;
+        padding-top: 0.25rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1369,7 +1457,7 @@ with tab3:
             )
         
         priority_colors = {
-            "High": "tag-orange",
+            "High": "tag-red",
             "Medium": "tag-blue",
             "Low": "tag-green"
         }
@@ -1382,7 +1470,7 @@ with tab3:
             with cols[idx % 2]:
                 priority = ticket.get('priority', 'Medium')
                 priority_class = f"priority-{priority.lower()}"
-                tag_class = "tag-red" if priority == "High" else ("tag-orange" if priority == "Medium" else "tag-blue")
+                tag_class = "tag-red" if priority == "High" else ("tag-red" if priority == "Medium" else "tag-blue")
                 
                 ticket_html = f"<div class='card {priority_class}' style='margin-bottom:0px; border-bottom-left-radius:0px; border-bottom-right-radius:0px;'><div style='display:flex; justify-content:space-between; align-items:start;'>" \
                               f"<h4 style='color:var(--text-primary); margin-bottom:0;'>{ticket['ticket_id']}</h4>" \

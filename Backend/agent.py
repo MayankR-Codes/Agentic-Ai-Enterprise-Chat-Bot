@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 
@@ -14,6 +15,34 @@ load_dotenv(override=True)
 API_KEY = os.getenv("GROQ_API_KEY")
 if not API_KEY:
     raise ValueError("GROQ_API_KEY missing")
+
+
+# ==================== GREETING DETECTION ====================
+GREETING_KEYWORDS = [
+    "hi", "hello", "hey", "good morning", "good afternoon", "good evening",
+    "how are you", "how r u", "whats up", "what's up", "sup", "howdy"
+]
+
+GREETING_RESPONSES = {
+    "greeting": "Hi {username}! 👋 How can I help you today? I can assist with:\n• Answering questions from company documents\n• Scheduling HR meetings\n• Creating IT support tickets"
+}
+
+def is_greeting(user_input: str) -> bool:
+    """Check if user input is a greeting"""
+    text = user_input.lower().strip()
+    # Remove punctuation and extra spaces
+    text = re.sub(r'[?!.,]', '', text)
+    
+    for keyword in GREETING_KEYWORDS:
+        if text == keyword or text.startswith(keyword + " "):
+            return True
+    
+    # Check for variations like "hi there", "hello friend", etc.
+    for keyword in GREETING_KEYWORDS:
+        if keyword in text and len(text.split()) <= 3:
+            return True
+    
+    return False
 
 
 # ==================== LLM (SUPPORTED MODEL) ====================
@@ -71,6 +100,13 @@ class EnterpriseAgent:
         """
         EXACTLY ONE LLM CALL per user message
         """
+        
+        # 0️⃣ GREETING DETECTION (NO LLM CALL)
+        if is_greeting(user_input):
+            username = self.user_info.get('full_name', 'there').split()[0] if self.user_info.get('full_name') else 'there'
+            return {
+                "output": GREETING_RESPONSES["greeting"].format(username=username)
+            }
 
         # 1️⃣ Confirmation flow (NO LLM CALL)
         if self.pending_action:
@@ -171,6 +207,16 @@ class EnterpriseAgent:
         if not self.retriever:
             return {"output": "Knowledge base unavailable."}
 
+        # Check query length - very short queries are usually not valid
+        if len(query.strip()) < 5:
+            return {
+                "output": (
+                    "Could you please provide more details? "
+                    "Ask me something specific like 'What are the company's CSR initiatives?' "
+                    "or 'Tell me about digital transformation at HCLTech'"
+                )
+            }
+
         docs = self.retriever.invoke(query)
 
         if not docs:
@@ -181,9 +227,39 @@ class EnterpriseAgent:
                 )
             }
 
+        # Validate retrieved documents - check if any document has reasonable relevance
+        # Filter out very low relevance documents
+        valid_docs = []
+        for doc in docs:
+            content = doc.page_content.lower()
+            query_lower = query.lower()
+            
+            # Check if main keywords from query appear in the document
+            words = [w for w in query_lower.split() if len(w) > 3]  # Get main words (longer than 3 chars)
+            
+            # Must have at least one keyword match from the query
+            keyword_match_count = sum(1 for word in words if word in content)
+            
+            # If less than 25% of query matches, it might be irrelevant
+            if len(words) > 0 and keyword_match_count / len(words) >= 0.25:
+                valid_docs.append(doc)
+        
+        # If no valid documents found after keyword matching, return out of documents
+        if not valid_docs:
+            return {
+                "output": (
+                    "This question is OUT OF DOCUMENTS - "
+                    "I can only answer questions related to the provided enterprise documents. "
+                    "Try asking about company initiatives, CSR programs, technology focus, or organizational details."
+                )
+            }
+        
+        # Use valid documents for answer generation
+        docs_to_use = valid_docs[:3] if valid_docs else docs[:3]
+
         # Build context with page information for each chunk
         context_with_pages = ""
-        for idx, d in enumerate(docs[:3], 1):
+        for idx, d in enumerate(docs_to_use, 1):
             page = d.metadata.get("page", "N/A")
             content = d.page_content[:800]
             context_with_pages += f"(Page {page})\n{content}\n\n---\n\n"
