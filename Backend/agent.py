@@ -1,7 +1,6 @@
 import os
 import json
 import re
-from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 
 from .prompts import ISSUE_DETECTION_PROMPT
@@ -10,7 +9,12 @@ from .rag_engine import load_vector_db
 
 
 # ==================== ENV ====================
-load_dotenv(override=True)
+# Load environment variables (optional for cloud deployment)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+except ImportError:
+    pass  # dotenv not needed on Streamlit Cloud
 
 # Try to get API key from Streamlit secrets first (for cloud), then fallback to env variables (for local)
 try:

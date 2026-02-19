@@ -1,5 +1,4 @@
 import streamlit as st
-from dotenv import load_dotenv
 import pandas as pd
 from datetime import datetime
 import time
@@ -7,7 +6,12 @@ import textwrap
 import os
 
 # -------------------- ENV --------------------
-load_dotenv()
+# Load environment variables (optional for cloud deployment)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not needed on Streamlit Cloud
 
 # Helper function to get environment variables from st.secrets (cloud) or .env (local)
 def get_secret(key, default=None):
