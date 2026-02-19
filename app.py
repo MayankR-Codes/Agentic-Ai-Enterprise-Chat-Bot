@@ -1,5 +1,5 @@
 import streamlit as st
-from dotenv import load_dotenv
+from .env import load_.env
 import pandas as pd
 from datetime import datetime
 import time
