@@ -9,6 +9,13 @@ import os
 # -------------------- ENV --------------------
 load_dotenv()
 
+# Helper function to get environment variables from st.secrets (cloud) or .env (local)
+def get_secret(key, default=None):
+    try:
+        return st.secrets.get(key, os.getenv(key, default))
+    except:
+        return os.getenv(key, default)
+
 # -------------------- BACKEND --------------------
 from Backend.agent import get_agent
 from Backend.tools import get_all_tickets, get_all_meetings, get_user_tickets, get_user_meetings
@@ -1312,15 +1319,15 @@ with tab1:
                         </div>
                         """, unsafe_allow_html=True)
 
-        if not os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY") == "your_actual_key_here":
+        groq_key = get_secret("GROQ_API_KEY")
+        if not groq_key or groq_key == "your_actual_key_here":
             st.warning("**AI Setup Required**")
             st.markdown(textwrap.dedent("""
                 AI features like meeting scheduling and ticket resolution are currently disabled.
                 
                 1. Get your key at [Groq Console](https://console.groq.com/keys)
-                2. Open `.env` in the root folder
-                3. Replace the placeholder with your key:
-                   `GROQ_API_KEY=gsk_...`
+                2. For local: Add to `.env` file: `GROQ_API_KEY=gsk_...`
+                3. For Streamlit Cloud: Add to App Settings → Secrets
             """))
     
     # -------- INPUT FIELD (BELOW SCROLL) --------

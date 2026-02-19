@@ -12,7 +12,13 @@ from .rag_engine import load_vector_db
 # ==================== ENV ====================
 load_dotenv(override=True)
 
-API_KEY = os.getenv("GROQ_API_KEY")
+# Try to get API key from Streamlit secrets first (for cloud), then fallback to env variables (for local)
+try:
+    import streamlit as st
+    API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY"))
+except:
+    API_KEY = os.getenv("GROQ_API_KEY")
+
 if not API_KEY:
     raise ValueError("GROQ_API_KEY missing")
 
@@ -63,7 +69,7 @@ def create_llm():
             return ChatGroq(
                 model=model,
                 temperature=0,
-                groq_api_key=os.getenv("GROQ_API_KEY"),
+                groq_api_key=API_KEY,
             )
         except Exception:
             continue
